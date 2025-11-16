@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Aurora Job Predictor</title>
+
+    <!-- Tailwind CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Tailwind config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary-neon': '#2563eb',
+                        'secondary-accent': '#7c3aed',
+                        'bg-dark': '#f8fafc',
+                        'bg-card': '#ffffff',
+                        'text-light': '#0f172a',
+                    },
+                    fontFamily: {
+                        sans: ['ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'Noto Sans', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        'neon': '0 0 20px rgba(0, 234, 255, 0.6), 0 0 40px rgba(194, 68, 255, 0.4)',
+                        'inner-neon': 'inset 0 0 8px rgba(0, 234, 255, 0.4)'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        :root { --text-color: #0f172a; }
+        html,body{height:100%;margin:0;padding:0;}
+        body {
+            background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+            background-attachment: fixed;
+            color: var(--text-color);
+            font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+            min-height: 100vh;
+        }
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .focus-ring:focus{outline:2px solid rgba(37,99,235,0.25);outline-offset:2px}
+        .chart-row{display:flex;align-items:center;margin-bottom:10px}
+        .chart-label{width:220px;font-weight:600;color:#334155}
+        .chart-bar{height:100%;background:linear-gradient(90deg,#00eaff,#c244ff);border-radius:6px;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;color:#0b1220;font-weight:700}
+        .page{animation:fadeIn 0.5s ease-in-out;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:600px;}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
+        .main-container{background:rgba(255,255,255,0.98);backdrop-filter:blur(15px);border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.5);}
+        .page-card{background:linear-gradient(135deg,#ffffff 0%,#f0f4ff 100%);border:3px solid rgba(37,99,235,0.4);border-radius:16px;padding:32px;box-shadow:0 16px 48px rgba(0,0,0,0.2),0 0 40px rgba(37,99,235,0.3);transition:all 0.4s ease;backdrop-filter:blur(10px);}
+        .page-card:hover{box-shadow:0 24px 64px rgba(37,99,235,0.4),0 0 60px rgba(124,58,237,0.4);border-color:rgba(124,58,237,0.6);transform:translateY(-6px) scale(1.01)}
+        .checkbox-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;}
+        .checkbox-item{display:flex;align-items:center;padding:10px;border-radius:8px;border:2px solid #e2e8f0;cursor:pointer;transition:all 0.2s;}
+        .checkbox-item:hover{background:#f0f4ff;border-color:#7c3aed;box-shadow:0 0 8px rgba(124,58,237,0.1);}
+        .checkbox-item input[type='checkbox']{cursor:pointer;width:18px;height:18px;margin-right:10px;accent-color:#2563eb;}
+        .textarea-enhanced{background:#f8fafc;border:2px solid #e2e8f0;border-radius:10px;padding:16px;font-size:1rem;transition:all 0.2s;min-height:150px;}
+        .textarea-enhanced:focus{border-color:#7c3aed;box-shadow:0 0 12px rgba(124,58,237,0.2);background:white;}
+        .button-group{display:flex;gap:12px;flex-wrap:wrap;margin-top:16px;}
+        .btn-primary{background:linear-gradient(135deg,#2563eb,#1e40af);color:white;padding:10px 20px;border-radius:8px;border:none;cursor:pointer;font-weight:600;transition:all 0.3s;}
+        .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 16px rgba(37,99,235,0.3);}
+        .btn-secondary{background:linear-gradient(135deg,#7c3aed,#6d28d9);color:white;padding:10px 20px;border-radius:8px;border:none;cursor:pointer;font-weight:600;transition:all 0.3s;}
+        .btn-secondary:hover{transform:translateY(-2px);box-shadow:0 8px 16px rgba(124,58,237,0.3);}
+        .text-section{text-align:center;margin:24px 0;}
+        .title-gradient{background:linear-gradient(135deg,#2563eb,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+        .desc-text{color:#666;font-size:0.95rem;line-height:1.6;margin-top:8px;}
+        .progress-bar{height:6px;background:#e2e8f0;border-radius:10px;overflow:hidden;margin:16px 0;}
+        .progress-bar-fill{height:100%;background:linear-gradient(90deg,#2563eb,#7c3aed);transition:width 0.3s ease;}
+    </style>
+</head>
+<body>
+    <!-- Topbar -->
+    <header class="w-full p-6 border-b-2 border-white/30 bg-gradient-to-r from-primary-neon/40 via-secondary-accent/40 to-pink-500/40 backdrop-blur-xl">
+        <div class="max-w-7xl mx-auto flex flex-col items-center justify-between md:flex-row md:items-center gap-3">
+            <div class="flex-1"></div>
+            <div class="flex flex-col items-center md:flex-row md:items-center gap-3">
+                <div class="text-4xl font-black bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent drop-shadow-lg">✨ Aurora Job Predictor</div>
+            </div>
+            <div class="flex-1 flex items-center justify-end gap-4">
+                <div class="text-sm text-white/90" id="authText">Not signed in</div>
+                <button id="btnAuth" class="px-3 py-2 bg-secondary-accent text-white rounded-lg">Sign In</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto p-6">
+        <div class="flex justify-center">
+            <!-- Main form / pages -->
+            <div class="main-container p-8 rounded-2xl w-full max-w-4xl">
+                <form id="careerForm">
+                    <div class="mb-6 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div id="stepIndicator" class="flex gap-2"></div>
+                            <div class="text-sm text-gray-500">Step <span id="currentStep">1</span> of 9</div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button id="saveAllBtn" type="button" class="px-4 py-2 bg-gradient-to-r from-secondary-accent to-purple-600 text-white rounded-lg font-semibold hover:shadow-lg transition">Save Draft</button>
+                            <button id="resetAllBtn" type="button" class="px-4 py-2 bg-gray-200 border-2 border-gray-400 rounded-lg hover:bg-gray-300 transition">Reset</button>
+                        </div>
+                    </div>
+
+                    <div id="pagesContainer" class="bg-gradient-to-br from-white to-blue-50 rounded-2xl p-8 border-2 border-purple-200/50 shadow-inner">
+                        <!-- Pages inserted here (same content as before) -->
+                        <!-- Page 1 -->
+                        <section data-page="1" class="page" id="page-1">
+                            <div style="max-width:650px;width:100%;">
+                                <h2 class="text-3xl font-bold bg-gradient-to-r from-primary-neon to-secondary-accent bg-clip-text text-transparent mb-3 text-center mt-6">1. Core Credentials</h2>
+                                <p class="text-sm text-gray-600 mb-6 text-center">Provide the essential personal and professional credentials.</p>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-semibold mb-2">Full Name</label>
+                                        <input id="fullName" name="FullName" type="text" class="w-full p-3 bg-gray-100 border-2 border-gray-300 rounded-lg focus:border-primary-neon focus:bg-white focus-ring transition" placeholder="Your name" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold mb-2">Email</label>
+                                        <input id="email" name="Email" type="email" class="w-full p-3 bg-gray-100 border-2 border-gray-300 rounded-lg focus:border-primary-neon focus:bg-white focus-ring transition" placeholder="you@example.com" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold mb-2">Phone</label>
+                                        <input id="phone" name="Phone" type="tel" class="w-full p-3 bg-gray-100 border-2 border-gray-300 rounded-lg focus:border-primary-neon focus:bg-white focus-ring transition" placeholder="+91 98765 43210" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold mb-2">Preferred Location</label>
+                                        <input id="prefLocation" name="PreferredLocation" type="text" class="w-full p-3 bg-gray-100 border-2 border-gray-300 rounded-lg focus:border-primary-neon focus:bg-white focus-ring transition" placeholder="City, State or Remote" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold mb-2">Qualification</label>
+                                        <select id="qualification" name="QualificationLevel" class="w-full p-3 bg-gray-100 border-2 border-gray-300 rounded-lg focus:border-primary-neon focus:bg-white focus-ring transition">
+                                            <option value="4">M.Tech/Ph.D.</option>
+                                            <option value="3">B.Tech/M.Sc./BCA</option>
+                                            <option value="2">Diploma/Associate</option>
+                                            <option value="1">High School/Vocational</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold mb-2">Years Experience</label>
+                                        <input id="experience" name="YearsExperience" type="number" min="0" max="50" value="0" class="w-full p-3 bg-gray-100 border-2 border-gray-300 rounded-lg focus:border-primary-neon focus:bg-white focus-ring transition" />
+                                    </div>
+                                    <div class="md:col-span-2">
+                                        <label class="block text-sm font-semibold mb-2">Resume (PDF)</label>
+                                        <input id="resumeFile" name="Resume" type="file" accept="application/pdf" class="w-full p-2 bg-gray-100 border-2 border-gray-300 rounded-lg focus:border-primary-neon focus-ring transition" />
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Page 2 -->
+                        <section data-page="2" class="page hidden" id="page-2">
+                            <div style="max-width:700px;width:100%;">
+                                <h2 class="text-3xl font-bold bg-gradient-to-r from-primary-neon to-secondary-accent bg-clip-text text-transparent mb-3 text-center mt-6">2. Technical Mastery</h2>
+                                <p class="text-sm text-gray-600 mb-6 text-center">Select the technologies you're proficient in.</p>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div class="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-lg border-2 border-blue-200">
+                                        <h4 class="font-bold mb-4 text-secondary-accent text-lg">💻 Core Tech Skills</h4>
+                                        <div class="grid grid-cols-1 gap-3 text-sm" id="techChecklist">
+                                            <label class="flex items-center cursor-pointer hover:bg-white p-2 rounded transition"><input id="skill_python" name="Skill_Python" type="checkbox" class="form-checkbox mr-3 w-5 h-5"> Python</label>
+                                            <label class="flex items-center cursor-pointer hover:bg-white p-2 rounded transition"><input id="skill_ml" name="Skill_ML" type="checkbox" class="form-checkbox mr-3 w-5 h-5"> Machine Learning</label>
+                                            <label class="flex items-center cursor-pointer hover:bg-white p-2 rounded transition"><input id="skill_web" name="Skill_WebDev" type="checkbox" class="form-checkbox mr-3 w-5 h-5"> Frontend (React)</label>
+                                            <label class="flex items-center cursor-pointer hover:bg-white p-2 rounded transition"><input id="skill_node" name="Skill_Node" type="checkbox" class="form-checkbox mr-3 w-5 h-5"> Backend (Node.js)</label>
+                                            <label class="flex items-center cursor-pointer hover:bg-white p-2 rounded transition"><input id="skill_sql" name="Skill_SQL" type="checkbox" class="form-checkbox mr-3 w-5 h-5"> SQL</label>
+                                            <label class="flex items-center cursor-pointer hover:bg-white p-2 rounded transition"><input id="skill_nosql" name="Skill_NoSQL" type="checkbox" class="form-checkbox mr-3 w-5 h-5"> NoSQL</label>
+                                            <label class="flex items-center cursor-pointer hover:bg-white p-2 rounded transition"><input id="skill_cloud" name="Skill_Cloud" type="checkbox" class="form-checkbox mr-3 w-5 h-5"> Cloud Fundamentals</label>
+                                            <label class="flex items-center cursor-pointer hover:bg-white p-2 rounded transition"><input id="skill_aws" name="Skill_AWS" type="checkbox" class="form-checkbox mr-3 w-5 h-5"> AWS</label>
+                                            <label class="flex items-center cursor-pointer hover:bg-white p-2 rounded transition"><input id="skill_gcp" name="Skill_GCP" type="checkbox" class="form-checkbox mr-3 w-5 h-5"> GCP</label>
+                                            <label class="flex items-center cursor-pointer hover:bg-white p-2 rounded transition"><input id="skill_dataeng" name="Skill_DataEng" type="checkbox" class="form-checkbox mr-3 w-5 h-5"> Data Engineering</label>
+                                            <label class="flex items-center cursor-pointer hover:bg-white p-2 rounded transition"><input id="skill_devops" name="Skill_DevOps" type="checkbox" class="form-checkbox mr-3 w-5 h-5"> DevOps (Docker/K8s)</label>
+                                            <label class="flex items-center cursor-pointer hover:bg-white p-2 rounded transition"><input id="skill_nlp" name="Skill_NLP" type="checkbox" class="form-checkbox mr-3 w-5 h-5"> NLP / LLM</label>
+                                            <label class="flex items-center cursor-pointer hover:bg-white p-2 rounded transition"><input id="skill_ai" name="Skill_AI_Exposure" type="checkbox" class="form-checkbox mr-3 w-5 h-5"> AI Exposure</label>
+                                        </div>
+                                    </div>
+                                    <div class="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-lg border-2 border-purple-200">
+                                        <h4 class="font-bold mb-4 text-secondary-accent text-lg">⭐ Experience Level</h4>
+                                        <label class="block text-sm font-semibold mb-2">Portfolio Quality (1-5)</label>
+                                        <input id="portfolio" name="PortfolioQuality" type="range" min="1" max="5" value="3" class="w-full h-2 mb-2" />
+                                        <div class="text-center text-lg font-bold text-secondary-accent mb-4"><span id="portfolioVal">3</span>/5</div>
+                                        <label class="block text-sm font-semibold mb-2">Certifications</label>
+                                        <select id="certification" name="CertificationLevel" class="w-full p-3 bg-white border-2 border-purple-300 rounded-lg focus:border-secondary-accent focus-ring transition">
+                                            <option value="3">Advanced</option>
+                                            <option value="2">Intermediate</option>
+                                            <option value="1">None</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Page 3: Work Experience -->
+                        <section data-page="3" class="page hidden" id="page-3">
+                            <div style="max-width:720px;width:100%;">
+                                <h2 class="text-3xl font-bold bg-gradient-to-r from-primary-neon to-secondary-accent bg-clip-text text-transparent mb-3 text-center mt-6">3. Work Experience</h2>
+                                <div class="page-card">
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label class="block text-sm font-semibold mb-2">Total Years of Experience</label>
+                                            <input id="experience_display" type="number" class="w-full p-3 bg-gray-50 border-2 border-gray-200 rounded-lg" disabled />
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-semibold mb-2">Experience Relevance to Target Role (1-5)</label>
+                                            <select id="exp_relevance" name="ExperienceRelevance" class="w-full p-3 border-2 border-gray-200 rounded-lg">
+                                                <option value="5">5 - Highly Relevant</option>
+                                                <option value="4">4 - Relevant</option>
+                                                <option value="3">3 - Somewhat Relevant</option>
+                                                <option value="2">2 - Low Relevance</option>
+                                                <option value="1">1 - Not Relevant</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-semibold mb-2">Past Job Titles & Key Responsibilities</label>
+                                            <textarea id="past_titles" name="PastJobTitles" rows="4" class="w-full p-3 bg-gray-50 border-2 border-gray-200 rounded-lg" placeholder="List past titles and responsibilities"></textarea>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-semibold mb-2">Experience in Required Technologies / Tools</label>
+                                            <textarea id="exp_tools" name="ExperienceTools" rows="3" class="w-full p-3 bg-gray-50 border-2 border-gray-200 rounded-lg" placeholder="E.g., Docker, TensorFlow, PostgreSQL"></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Page 4: Job Market Data -->
+                        <section data-page="4" class="page hidden" id="page-4">
+                            <div style="max-width:720px;width:100%;">
+                                <h2 class="text-3xl font-bold bg-gradient-to-r from-primary-neon to-secondary-accent bg-clip-text text-transparent mb-3 text-center mt-6">4. Job Market Data</h2>
+                                <div class="page-card">
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label class="block text-sm font-semibold mb-2">Current Demand for the Role</label>
+                                            <select id="market_demand" name="MarketDemand" class="w-full p-3 border-2 border-gray-200 rounded-lg">
+                                                <option value="High">High</option>
+                                                <option value="Medium">Medium</option>
+                                                <option value="Low">Low</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-semibold mb-2">Market Trends</label>
+                                            <textarea id="market_trends" name="MarketTrends" rows="3" class="w-full p-3 bg-gray-50 border-2 border-gray-200 rounded-lg" placeholder="E.g., AI roles increasing, backend demand fluctuating"></textarea>
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label class="block text-sm font-semibold mb-2">Average Salary Expectation (annual, USD)</label>
+                                                <input id="avg_salary" name="AvgSalary" type="number" min="0" class="w-full p-3 border-2 border-gray-200 rounded-lg" />
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-semibold mb-2">Location-based Opportunities</label>
+                                                <input id="location_opps" name="LocationOpportunities" type="text" class="w-full p-3 border-2 border-gray-200 rounded-lg" placeholder="Major cities / remote availability" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Page 5: Company Requirements -->
+                        <section data-page="5" class="page hidden" id="page-5">
+                            <div style="max-width:720px;width:100%;">
+                                <h2 class="text-3xl font-bold bg-gradient-to-r from-primary-neon to-secondary-accent bg-clip-text text-transparent mb-3 text-center mt-6">5. Company Requirements</h2>
+                                <div class="page-card">
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label class="block text-sm font-semibold mb-2">Cultural Fit (select best match)</label>
+                                            <select id="cultural_fit" name="CulturalFit" class="w-full p-3 border-2 border-gray-200 rounded-lg">
+                                                <option value="Innovative">Innovative / Fast-paced</option>
+                                                <option value="Stable">Stable / Process-driven</option>
+                                                <option value="Collaborative">Collaborative / Team-first</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-semibold mb-2">Communication Expectations</label>
+                                            <select id="comm_expect" name="CommunicationExpectations" class="w-full p-3 border-2 border-gray-200 rounded-lg">
+                                                <option value="High">High (frequent cross-team updates)</option>
+                                                <option value="Medium">Medium</option>
+                                                <option value="Low">Asynchronous / Low</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-semibold mb-2">Specific Certifications or Clearances</label>
+                                            <input id="certs_required" name="CertificationsRequired" type="text" class="w-full p-3 border-2 border-gray-200 rounded-lg" placeholder="E.g., Security clearance, AWS certs" />
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-semibold mb-2">Work Schedule Preference</label>
+                                            <select id="work_schedule" name="WorkSchedule" class="w-full p-3 border-2 border-gray-200 rounded-lg">
+                                                <option value="Onsite">Onsite</option>
+                                                <option value="Hybrid">Hybrid</option>
+                                                <option value="Remote">Remote</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Page 6: Interview Performance Data -->
+                        <section data-page="6" class="page hidden" id="page-6">
+                            <div style="max-width:720px;width:100%;">
+                                <h2 class="text-3xl font-bold bg-gradient-to-r from-primary-neon to-secondary-accent bg-clip-text text-transparent mb-3 text-center mt-6">6. Interview Performance Data</h2>
+                                <div class="page-card">
+                                    <div class="space-y-4">
+                                        <div class="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label class="block text-sm font-semibold mb-2">Online Assessment Score (0-100)</label>
+                                                <input id="assessment_score" name="AssessmentScore" type="number" min="0" max="100" class="w-full p-3 border-2 border-gray-200 rounded-lg" />
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-semibold mb-2">Coding Test Score (0-100)</label>
+                                                <input id="coding_score" name="CodingTestScore" type="number" min="0" max="100" class="w-full p-3 border-2 border-gray-200 rounded-lg" />
+                                            </div>
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label class="block text-sm font-semibold mb-2">HR Interview Rating (1-5)</label>
+                                                <input id="hr_rating" name="HRRating" type="number" min="1" max="5" class="w-full p-3 border-2 border-gray-200 rounded-lg" />
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-semibold mb-2">Technical Interview Score (0-100)</label>
+                                                <input id="tech_score" name="TechnicalInterviewScore" type="number" min="0" max="100" class="w-full p-3 border-2 border-gray-200 rounded-lg" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Page 7: Behavioral Indicators -->
+                        <section data-page="7" class="page hidden" id="page-7">
+                            <div style="max-width:720px;width:100%;">
+                                <h2 class="text-3xl font-bold bg-gradient-to-r from-primary-neon to-secondary-accent bg-clip-text text-transparent mb-3 text-center mt-6">7. Behavioral Indicators</h2>
+                                <div class="page-card">
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label class="block text-sm font-semibold mb-2">Personality Traits (MBTI / Big-5 style)</label>
+                                            <input id="personality" name="PersonalityTraits" type="text" class="w-full p-3 border-2 border-gray-200 rounded-lg" placeholder="E.g., INTJ / High conscientiousness" />
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-semibold mb-2">Work Style / Behavior</label>
+                                            <select id="work_style" name="WorkStyle" class="w-full p-3 border-2 border-gray-200 rounded-lg">
+                                                <option value="Independent">Independent</option>
+                                                <option value="Collaborative">Collaborative</option>
+                                                <option value="Structured">Structured / Process-driven</option>
+                                                <option value="Flexible">Flexible / Adaptive</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-semibold mb-2">Past Job Stability (years at last roles)</label>
+                                            <input id="job_stability" name="JobStabilityYears" type="number" min="0" class="w-full p-3 border-2 border-gray-200 rounded-lg" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Page 8: External Factors -->
+                        <section data-page="8" class="page hidden" id="page-8">
+                            <div style="max-width:720px;width:100%;">
+                                <h2 class="text-3xl font-bold bg-gradient-to-r from-primary-neon to-secondary-accent bg-clip-text text-transparent mb-3 text-center mt-6">8. External Factors</h2>
+                                <div class="page-card">
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label class="block text-sm font-semibold mb-2">Industry Hiring Patterns</label>
+                                            <textarea id="industry_patterns" name="IndustryPatterns" rows="3" class="w-full p-3 border-2 border-gray-200 rounded-lg" placeholder="E.g., rapid AI hiring, seasonal demand"></textarea>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-semibold mb-2">Economic Conditions</label>
+                                            <textarea id="economic_conditions" name="EconomicConditions" rows="2" class="w-full p-3 border-2 border-gray-200 rounded-lg" placeholder="E.g., recessionary pressure, growth markets"></textarea>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-semibold mb-2">Recruiter Bias / Fairness Considerations</label>
+                                            <textarea id="recruiter_bias" name="RecruiterBias" rows="2" class="w-full p-3 border-2 border-gray-200 rounded-lg" placeholder="Notes on potential bias / fairness corrections"></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Page 9: Aurora Results -->
+                        <section data-page="9" class="page hidden" id="page-9">
+                            <div style="max-width:800px;width:100%;">
+                                <h2 class="text-3xl font-bold bg-gradient-to-r from-primary-neon to-secondary-accent bg-clip-text text-transparent mb-3 text-center mt-6">9. Aurora Analysis & Recommendations</h2>
+                                <div class="page-card">
+                                    <div class="space-y-6">
+                                        <div class="text-center">
+                                            <p class="text-sm font-semibold text-gray-600 mb-2">Predicted Career Role</p>
+                                            <div id="predictionResult" class="text-4xl md:text-5xl font-black bg-clip-text text-transparent bg-gradient-to-r from-primary-neon to-secondary-accent">-- Awaiting --</div>
+                                        </div>
+
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div class="text-center bg-gradient-to-br from-pink-50 to-rose-50 p-4 rounded-lg border-2 border-pink-200">
+                                                <p class="text-sm font-semibold text-gray-600 mb-2">Aurora Competency Score</p>
+                                                <div id="competencyScore" class="text-4xl font-bold text-secondary-accent">0/100</div>
+                                            </div>
+                                            <div class="text-center bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-lg border-2 border-green-200">
+                                                <p class="text-sm font-semibold text-gray-600 mb-2">Confidence Level</p>
+                                                <div id="accuracyScore" class="text-2xl font-bold text-green-600">0%</div>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <p id="scoreInterpretation" class="text-center font-bold text-lg text-primary-neon mb-3">Skill Level: Trainee</p>
+                                        </div>
+
+                                        <div class="border-t-2 border-gray-200 pt-4">
+                                            <h4 class="font-bold text-lg text-secondary-accent mb-3">📊 Score Breakdown</h4>
+                                            <div id="chartContainer" class="space-y-3"></div>
+                                        </div>
+
+                                        <div class="border-t-2 border-gray-200 pt-4">
+                                            <h4 class="font-bold text-lg text-secondary-accent mb-3">🎯 Skill Gap & Action Items</h4>
+                                            <div id="skillGapAnalysis" class="text-sm text-gray-700 space-y-2"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+
+                    <div class="mt-6 flex justify-between items-center gap-4">
+                        <button id="prevBtn" type="button" class="px-6 py-3 bg-gradient-to-r from-gray-300 to-gray-400 text-gray-800 font-bold rounded-lg hover:shadow-lg transition">← Previous</button>
+                        <div class="flex items-center gap-3">
+                            <div id="pageProgress" class="w-72 h-4 bg-gray-300 rounded-full overflow-hidden shadow-inner"><div id="pageProgressFill" class="h-full bg-gradient-to-r from-primary-neon to-secondary-accent w-0 transition-all duration-500"></div></div>
+                        </div>
+                        <button id="nextBtn" type="button" class="px-6 py-3 bg-gradient-to-r from-primary-neon to-secondary-accent text-white font-bold rounded-lg hover:shadow-lg transition">Next →</button>
+                    </div>
+
+                    <!-- Control Buttons -->
+                    <div class="mt-8 p-6 main-container rounded-2xl">
+                        <h3 class="text-2xl font-bold text-transparent bg-gradient-to-r from-primary-neon to-secondary-accent bg-clip-text mb-4">🎯 Career Analysis Controls</h3>
+                        <div class="space-y-3">
+                            <button id="predictBtn" type="button" class="w-full p-4 bg-gradient-to-r from-primary-neon via-purple-500 to-pink-500 text-white font-bold rounded-xl text-lg hover:shadow-2xl transition transform hover:scale-105">🚀 Run Career Analysis</button>
+                            <div class="grid grid-cols-2 gap-3">
+                                <button id="resetBtn" type="button" class="p-3 bg-gradient-to-r from-orange-400 to-red-500 text-white font-bold rounded-lg hover:shadow-lg transition">🔄 Reset Inputs</button>
+                                <button id="saveProfileBtn" type="button" class="p-3 bg-gradient-to-r from-green-400 to-emerald-500 text-white font-bold rounded-lg hover:shadow-lg transition">💾 Save Profile</button>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <button id="exportBtn" type="button" class="p-3 bg-gradient-to-r from-blue-400 to-cyan-500 text-white font-bold rounded-lg hover:shadow-lg transition">📥 Export JSON</button>
+                                <label for="importFile" class="p-3 bg-gradient-to-r from-purple-400 to-violet-500 text-white font-bold rounded-lg hover:shadow-lg transition text-center cursor-pointer">📤 Import JSON<input id="importFile" name="importFile" type="file" accept="application/json" class="hidden" /></label>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+
+                <div class="mt-4 text-sm text-text-light/80">Tip: Sign in to store multiple profiles to the server. Offline local saves are kept in your browser's localStorage.</div>
+            </div>
+        </div>
+
+        <!-- Footer notes / status -->
+        <div class="mt-6 text-xs text-text-light/60">
+            <strong>Note:</strong> This page simulates AI predictions locally and can call a remote `/api/predict` endpoint if available. For production, use HTTPS, server-side auth (OAuth/JWT), hashed passwords, and rate limiting.
+        </div>
+    </main>
+
+    <!-- AUTH MODAL -->
+    <div id="authModal" class="fixed inset-0 flex items-center justify-center bg-black/60 hidden z-50">
+        <div class="w-full max-w-md p-6 bg-bg-card rounded-xl border border-primary-neon/20">
+            <h3 class="text-xl font-bold text-primary-neon mb-3">Sign In</h3>
+            <p class="text-sm text-text-light/90 mb-4">This demo uses a client-side simulated auth token.</p>
+            <label class="block text-sm mb-1">Username</label>
+            <input id="authUser" type="text" class="w-full p-2 bg-bg-dark border border-secondary-accent rounded-lg mb-3 focus-ring" autocomplete="username" />
+            <label class="block text-sm mb-1">Password</label>
+            <input id="authPass" type="password" class="w-full p-2 bg-bg-dark border border-secondary-accent rounded-lg mb-4 focus-ring" autocomplete="current-password" />
+            <div class="flex gap-3">
+                <button id="doSignIn" class="flex-1 p-2 bg-primary-neon text-bg-dark rounded-lg font-semibold">Sign In</button>
+                <button id="doCancelAuth" class="flex-1 p-2 bg-bg-dark border border-secondary-accent rounded-lg">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SUCCESS TOAST -->
+    <div id="toast" class="fixed right-6 bottom-6 p-3 rounded-lg bg-primary-neon text-bg-dark hidden">Saved</div>
+
+    <!-- SCRIPT: Logic + Persistence + AI Integration + Auth -->
+    <script>
+        /**********************
+         * CONFIG & WEIGHTS
+         **********************/
+        const WEIGHTS = {
+            Credentials: { QualificationLevel: 10, YearsExperience: 8, CertificationLevel: 15, PortfolioQuality: 20, LinkedIn: 3, GitHub: 4 },
+            Technical: {
+                Skill_Python: 5, Skill_ML: 12, Skill_WebDev: 4, Skill_Node: 5, Skill_SQL: 6, Skill_NoSQL: 6,
+                Skill_Cloud: 10, Skill_AWS: 8, Skill_GCP: 7, Skill_DataEng: 10, Skill_DevOps: 8, Skill_NLP: 10, Skill_AI_Exposure: 15
+            },
+            SoftSkills: { Soft_Teamwork: 5, Soft_Comm: 5 }
+        };
+        const MAX_SCORE_RAW = 300;
+        const TOTAL_PAGES = 9;
+
+        /**********************
+         * DOM ELEMENTS
+         **********************/
+        const form = document.getElementById('careerForm');
+        const predictBtn = document.getElementById('predictBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const saveProfileBtn = document.getElementById('saveProfileBtn');
+        const exportBtn = document.getElementById('exportBtn');
+        const importFile = document.getElementById('importFile');
+        const predictionResultEl = document.getElementById('predictionResult');
+        const competencyScoreEl = document.getElementById('competencyScore');
+        const skillGapAnalysisEl = document.getElementById('skillGapAnalysis');
+        const chartContainer = document.getElementById('chartContainer');
+        const scoreInterp = document.getElementById('scoreInterpretation');
+        const accuracyScore = document.getElementById('accuracyScore');
+        const btnAuth = document.getElementById('btnAuth');
+        const authModal = document.getElementById('authModal');
+        const doSignIn = document.getElementById('doSignIn');
+        const doCancelAuth = document.getElementById('doCancelAuth');
+        const authText = document.getElementById('authText');
+        const toast = document.getElementById('toast');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const pageProgressFill = document.getElementById('pageProgressFill');
+        const currentStepEl = document.getElementById('currentStep');
+
+        const saveKey = 'aurora_profiles_v2';
+        const lastInputsKey = 'aurora_last_inputs_v2';
+        const lastResultKey = 'aurora_last_result_v2';
+
+        /**********************
+         * PAGE NAVIGATION
+         **********************/
+        let currentPage = 1;
+
+        function showPage(n) {
+            document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+            const el = document.querySelector(`[data-page="${n}"]`);
+            if (el) el.classList.remove('hidden');
+            currentStepEl.textContent = n;
+            const pct = Math.round((n / TOTAL_PAGES) * 100);
+            pageProgressFill.style.width = pct + '%';
+            // disable prev on page 1, next on last page
+            prevBtn.disabled = n === 1;
+            nextBtn.disabled = n === TOTAL_PAGES;
+        }
+
+        nextBtn.addEventListener('click', () => {
+            if (currentPage < TOTAL_PAGES) { currentPage++; showPage(currentPage); }
+        });
+
+        prevBtn.addEventListener('click', () => {
+            if (currentPage > 1) { currentPage--; showPage(currentPage); }
+        });
+
+        /**********************
+         * AUTH (client-side simulation)
+         **********************/
+        function isSignedIn() { return !!sessionStorage.getItem('aurora_token'); }
+
+        function updateAuthUI() {
+            if (isSignedIn()) {
+                authText.textContent = 'Signed in';
+                btnAuth.textContent = 'Sign Out';
+                predictBtn.disabled = false;
+            } else {
+                authText.textContent = 'Not signed in';
+                btnAuth.textContent = 'Sign In';
+                predictBtn.disabled = false;
+            }
+        }
+
+        btnAuth.addEventListener('click', () => {
+            if (isSignedIn()) {
+                sessionStorage.removeItem('aurora_token');
+                showToast('Signed out');
+                updateAuthUI();
+            } else {
+                authModal.classList.remove('hidden');
+            }
+        });
+
+        doCancelAuth.addEventListener('click', () => { authModal.classList.add('hidden'); });
+
+        doSignIn.addEventListener('click', () => {
+            const user = document.getElementById('authUser').value.trim();
+            const pass = document.getElementById('authPass').value;
+            if (!user || !pass) { alert('Enter username and password (demo).'); return; }
+            const fakeToken = btoa(`${user}:${Math.random().toString(36).slice(2)}`);
+            sessionStorage.setItem('aurora_token', fakeToken);
+            sessionStorage.setItem('aurora_user', user);
+            authModal.classList.add('hidden');
+            showToast('Signed in');
+            updateAuthUI();
+        });
+
+        /**********************
+         * FORM DATA PERSISTENCE
+         **********************/
+        function getFormDataObject() {
+            const fd = new FormData(form);
+            const obj = {};
+            obj.YearsExperience = parseInt(fd.get('YearsExperience') || 0);
+            obj.QualificationLevel = parseInt(fd.get('QualificationLevel') || 1);
+            obj.CertificationLevel = parseInt(fd.get('CertificationLevel') || 1);
+            obj.PortfolioQuality = parseInt(fd.get('PortfolioQuality') || 1);
+            obj.Soft_Teamwork = parseInt(fd.get('Soft_Teamwork') || 3);
+            obj.Soft_Comm = parseInt(fd.get('Soft_Comm') || 3);
+            obj.Skill_Python = document.getElementById('skill_python').checked ? 1 : 0;
+            obj.Skill_ML = document.getElementById('skill_ml').checked ? 1 : 0;
+            obj.Skill_WebDev = document.getElementById('skill_web').checked ? 1 : 0;
+            obj.Skill_Node = document.getElementById('skill_node').checked ? 1 : 0;
+            obj.Skill_SQL = document.getElementById('skill_sql').checked ? 1 : 0;
+            obj.Skill_NoSQL = document.getElementById('skill_nosql').checked ? 1 : 0;
+            obj.Skill_Cloud = document.getElementById('skill_cloud').checked ? 1 : 0;
+            obj.Skill_AWS = document.getElementById('skill_aws').checked ? 1 : 0;
+            obj.Skill_GCP = document.getElementById('skill_gcp').checked ? 1 : 0;
+            obj.Skill_DataEng = document.getElementById('skill_dataeng').checked ? 1 : 0;
+            obj.Skill_DevOps = document.getElementById('skill_devops').checked ? 1 : 0;
+            obj.Skill_NLP = document.getElementById('skill_nlp').checked ? 1 : 0;
+            obj.Skill_AI_Exposure = document.getElementById('skill_ai').checked ? 1 : 0;
+            // Work Experience page fields
+            obj.ExperienceRelevance = parseInt(document.getElementById('exp_relevance') ? document.getElementById('exp_relevance').value : 3);
+            obj.PastJobTitles = document.getElementById('past_titles') ? (document.getElementById('past_titles').value || '') : '';
+            obj.ExperienceTools = document.getElementById('exp_tools') ? (document.getElementById('exp_tools').value || '') : '';
+            // Job Market Data
+            obj.MarketDemand = document.getElementById('market_demand') ? document.getElementById('market_demand').value : '';
+            obj.MarketTrends = document.getElementById('market_trends') ? document.getElementById('market_trends').value : '';
+            obj.AvgSalary = parseInt(document.getElementById('avg_salary') ? (document.getElementById('avg_salary').value || 0) : 0);
+            obj.LocationOpportunities = document.getElementById('location_opps') ? (document.getElementById('location_opps').value || '') : '';
+            // Company Requirements
+            obj.CulturalFit = document.getElementById('cultural_fit') ? document.getElementById('cultural_fit').value : '';
+            obj.CommunicationExpectations = document.getElementById('comm_expect') ? document.getElementById('comm_expect').value : '';
+            obj.CertificationsRequired = document.getElementById('certs_required') ? document.getElementById('certs_required').value : '';
+            obj.WorkSchedule = document.getElementById('work_schedule') ? document.getElementById('work_schedule').value : '';
+            // Interview Performance
+            obj.AssessmentScore = parseInt(document.getElementById('assessment_score') ? (document.getElementById('assessment_score').value || 0) : 0);
+            obj.CodingTestScore = parseInt(document.getElementById('coding_score') ? (document.getElementById('coding_score').value || 0) : 0);
+            obj.HRRating = parseInt(document.getElementById('hr_rating') ? (document.getElementById('hr_rating').value || 0) : 0);
+            obj.TechnicalInterviewScore = parseInt(document.getElementById('tech_score') ? (document.getElementById('tech_score').value || 0) : 0);
+            // Behavioral Indicators
+            obj.PersonalityTraits = document.getElementById('personality') ? (document.getElementById('personality').value || '') : '';
+            obj.WorkStyle = document.getElementById('work_style') ? document.getElementById('work_style').value : '';
+            obj.JobStabilityYears = parseInt(document.getElementById('job_stability') ? (document.getElementById('job_stability').value || 0) : 0);
+            // External Factors
+            obj.IndustryPatterns = document.getElementById('industry_patterns') ? (document.getElementById('industry_patterns').value || '') : '';
+            obj.EconomicConditions = document.getElementById('economic_conditions') ? (document.getElementById('economic_conditions').value || '') : '';
+            obj.RecruiterBias = document.getElementById('recruiter_bias') ? (document.getElementById('recruiter_bias').value || '') : '';
+            const sectorNodes = Array.from(document.querySelectorAll('input[name="PreferredSectors"]'));
+            obj.PreferredSectors = sectorNodes.filter(n => n.checked).map(n => n.value);
+            obj.Email = fd.get('Email') || '';
+            obj.Phone = fd.get('Phone') || '';
+            obj.PreferredLocation = fd.get('PreferredLocation') || '';
+            obj.FullName = fd.get('FullName') || '';
+            const resume = document.getElementById('resumeFile');
+            obj.ResumeFileName = (resume && resume.files && resume.files[0]) ? resume.files[0].name : '';
+            return obj;
+        }
+
+        function populateFormFromObject(o) {
+            try {
+                if (document.getElementById('qualification')) document.getElementById('qualification').value = o.QualificationLevel || 3;
+                if (document.getElementById('experience')) document.getElementById('experience').value = o.YearsExperience || 0;
+                if (document.getElementById('experience_display')) document.getElementById('experience_display').value = o.YearsExperience || 0;
+                if (document.getElementById('certification')) document.getElementById('certification').value = o.CertificationLevel || 1;
+                if (document.getElementById('portfolio')) document.getElementById('portfolio').value = o.PortfolioQuality || 3;
+                if (document.getElementById('soft_teamwork')) document.getElementById('soft_teamwork').value = o.Soft_Teamwork || 3;
+                if (document.getElementById('soft_comm')) document.getElementById('soft_comm').value = o.Soft_Comm || 3;
+                if (document.getElementById('skill_python')) document.getElementById('skill_python').checked = !!o.Skill_Python;
+                document.getElementById('skill_ml').checked = !!o.Skill_ML;
+                document.getElementById('skill_web').checked = !!o.Skill_WebDev;
+                document.getElementById('skill_node').checked = !!o.Skill_Node;
+                document.getElementById('skill_sql').checked = !!o.Skill_SQL;
+                document.getElementById('skill_nosql').checked = !!o.Skill_NoSQL;
+                document.getElementById('skill_cloud').checked = !!o.Skill_Cloud;
+                document.getElementById('skill_aws').checked = !!o.Skill_AWS;
+                document.getElementById('skill_gcp').checked = !!o.Skill_GCP;
+                document.getElementById('skill_dataeng').checked = !!o.Skill_DataEng;
+                document.getElementById('skill_devops').checked = !!o.Skill_DevOps;
+                document.getElementById('skill_nlp').checked = !!o.Skill_NLP;
+                document.getElementById('skill_ai').checked = !!o.Skill_AI_Exposure;
+                // new page fields
+                if (document.getElementById('exp_relevance')) document.getElementById('exp_relevance').value = o.ExperienceRelevance || 3;
+                if (document.getElementById('past_titles')) document.getElementById('past_titles').value = o.PastJobTitles || '';
+                if (document.getElementById('exp_tools')) document.getElementById('exp_tools').value = o.ExperienceTools || '';
+                if (document.getElementById('market_demand')) document.getElementById('market_demand').value = o.MarketDemand || 'Medium';
+                if (document.getElementById('market_trends')) document.getElementById('market_trends').value = o.MarketTrends || '';
+                if (document.getElementById('avg_salary')) document.getElementById('avg_salary').value = o.AvgSalary || '';
+                if (document.getElementById('location_opps')) document.getElementById('location_opps').value = o.LocationOpportunities || '';
+                if (document.getElementById('cultural_fit')) document.getElementById('cultural_fit').value = o.CulturalFit || 'Innovative';
+                if (document.getElementById('comm_expect')) document.getElementById('comm_expect').value = o.CommunicationExpectations || 'Medium';
+                if (document.getElementById('certs_required')) document.getElementById('certs_required').value = o.CertificationsRequired || '';
+                if (document.getElementById('work_schedule')) document.getElementById('work_schedule').value = o.WorkSchedule || 'Hybrid';
+                if (document.getElementById('assessment_score')) document.getElementById('assessment_score').value = o.AssessmentScore || '';
+                if (document.getElementById('coding_score')) document.getElementById('coding_score').value = o.CodingTestScore || '';
+                if (document.getElementById('hr_rating')) document.getElementById('hr_rating').value = o.HRRating || '';
+                if (document.getElementById('tech_score')) document.getElementById('tech_score').value = o.TechnicalInterviewScore || '';
+                if (document.getElementById('personality')) document.getElementById('personality').value = o.PersonalityTraits || '';
+                if (document.getElementById('work_style')) document.getElementById('work_style').value = o.WorkStyle || 'Independent';
+                if (document.getElementById('job_stability')) document.getElementById('job_stability').value = o.JobStabilityYears || '';
+                if (document.getElementById('industry_patterns')) document.getElementById('industry_patterns').value = o.IndustryPatterns || '';
+                if (document.getElementById('economic_conditions')) document.getElementById('economic_conditions').value = o.EconomicConditions || '';
+                if (document.getElementById('recruiter_bias')) document.getElementById('recruiter_bias').value = o.RecruiterBias || '';
+                const sectors = o.PreferredSectors || [];
+                document.querySelectorAll('input[name="PreferredSectors"]').forEach(inp => { inp.checked = sectors.includes(inp.value); });
+                document.getElementById('email').value = o.Email || '';
+                document.getElementById('phone').value = o.Phone || '';
+                document.getElementById('prefLocation').value = o.PreferredLocation || '';
+                document.getElementById('fullName').value = o.FullName || '';
+            } catch (e) { console.warn('populate failed', e); }
+        }
+
+        form.addEventListener('input', () => { const obj = getFormDataObject(); localStorage.setItem(lastInputsKey, JSON.stringify(obj)); });
+
+        window.addEventListener('load', () => {
+            updateAuthUI();
+            const last = localStorage.getItem(lastInputsKey);
+            if (last) { try { populateFormFromObject(JSON.parse(last)); } catch (e) { console.warn('Failed to load last inputs', e); } }
+            const lastResult = localStorage.getItem(lastResultKey);
+            if (lastResult) { try { const r = JSON.parse(lastResult); applyPredictionToUI(r); } catch (e) {} }
+            showPage(1);
+        });
+
+        /**********************
+         * BUTTON HANDLERS
+         **********************/
+        resetBtn.addEventListener('click', () => {
+            form.reset();
+            document.getElementById('out_teamwork').value = 3;
+            document.getElementById('out_comm').value = 3;
+            localStorage.removeItem(lastInputsKey);
+            resetResults();
+            showToast('Inputs reset');
+        });
+
+        exportBtn.addEventListener('click', () => {
+            const obj = getFormDataObject();
+            const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = 'aurora_profile.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); showToast('Profile exported');
+        });
+
+        importFile.addEventListener('change', (ev) => {
+            const f = ev.target.files[0]; if (!f) return; const reader = new FileReader(); reader.onload = (e) => { try { const obj = JSON.parse(e.target.result); populateFormFromObject(obj); localStorage.setItem(lastInputsKey, JSON.stringify(obj)); showToast('Profile imported'); } catch (err) { alert('Invalid profile JSON'); } };
+            reader.readAsText(f); importFile.value = '';
+        });
+
+        saveProfileBtn.addEventListener('click', () => {
+            const profiles = JSON.parse(localStorage.getItem(saveKey) || '[]');
+            const obj = getFormDataObject(); const ts = new Date().toISOString(); profiles.unshift({ id: ts, name: `Profile ${ts}`, data: obj }); localStorage.setItem(saveKey, JSON.stringify(profiles)); showToast('Profile saved locally');
+        });
+
+        // Portfolio range listener
+        if (document.getElementById('portfolio')) {
+            document.getElementById('portfolio').addEventListener('input', (e) => {
+                if (document.getElementById('portfolioVal')) {
+                    document.getElementById('portfolioVal').textContent = e.target.value;
+                }
+            });
+        }
+
+        // Years experience mirror to display field
+        if (document.getElementById('experience')) {
+            document.getElementById('experience').addEventListener('input', (e) => {
+                if (document.getElementById('experience_display')) document.getElementById('experience_display').value = e.target.value;
+            });
+            // initialize display
+            if (document.getElementById('experience_display')) document.getElementById('experience_display').value = document.getElementById('experience').value || 0;
+        }
+
+        // Export Results button (Page 6)
+        if (document.getElementById('exportResultBtn')) {
+            document.getElementById('exportResultBtn').addEventListener('click', () => { exportBtn.click(); });
+        }
+
+        /**********************
+         * PREDICTION LOGIC
+         **********************/
+        function showToast(msg, ms = 2000) { toast.textContent = msg; toast.classList.remove('hidden'); setTimeout(() => toast.classList.add('hidden'), ms); }
+
+        function resetResults() {
+            predictionResultEl.textContent = '-- Awaiting Data --';
+            competencyScoreEl.textContent = '0 / 100';
+            scoreInterp.textContent = 'Level: Trainee';
+            skillGapAnalysisEl.textContent = 'Fill the form and run the analysis.';
+            accuracyScore.textContent = 'Predicted Confidence: 0%';
+            chartContainer.innerHTML = '<p class="text-sm text-gray-400">Run analysis to see weighted score distribution.</p>';
+            localStorage.removeItem(lastResultKey);
+        }
+
+        function applyPredictionToUI(res) {
+            predictionResultEl.textContent = res.role;
+            competencyScoreEl.textContent = `${res.finalScore} / 100`;
+            scoreInterp.textContent = res.interpretation;
+            accuracyScore.textContent = `Predicted Confidence: ${res.confidence}`;
+            skillGapAnalysisEl.innerHTML = res.skillGap;
+            renderChart(res.breakdown || { Credentials: 0, Technical: 0, SoftSkills: 0 });
+            localStorage.setItem(lastResultKey, JSON.stringify(res));
+            // automatically go to results page
+            currentPage = 9; showPage(9);
+        }
+
+        function renderChart(breakdown) {
+            chartContainer.innerHTML = '';
+            const chartData = [
+                { label: 'Credentials (W=53)', score: breakdown.Credentials || 0 },
+                { label: 'Technical Mastery (W=52)', score: breakdown.Technical || 0 },
+                { label: 'Soft Skills (W=10)', score: breakdown.SoftSkills || 0 }
+            ];
+            const maxCategoryScore = Math.max(...chartData.map(d => d.score));
+            const referenceScore = Math.max(120, maxCategoryScore * 1.2);
+            chartData.forEach(item => {
+                const widthPercent = (item.score / referenceScore) * 100;
+                const div = document.createElement('div'); div.className = 'chart-row';
+                div.innerHTML = `
+                    <div class="chart-label">${item.label}:</div>
+                    <div class="flex-1 bg-gray-200 h-6 rounded-md ml-3">
+                        <div class="chart-bar" style="width: ${Math.max(2, widthPercent).toFixed(0)}%;">
+                            <div class="text-sm pr-2">${item.score.toFixed(0)}</div>
+                        </div>
+                    </div>
+                `;
+                chartContainer.appendChild(div);
+            });
+        }
+
+        function localSimulatedAIPrediction(data) {
+            let scoreBreakdown = { Credentials: 0, Technical: 0, SoftSkills: 0 };
+            scoreBreakdown.Credentials += data.QualificationLevel * WEIGHTS.Credentials.QualificationLevel;
+            scoreBreakdown.Credentials += Math.min(8, data.YearsExperience) * WEIGHTS.Credentials.YearsExperience;
+            scoreBreakdown.Credentials += data.CertificationLevel * WEIGHTS.Credentials.CertificationLevel;
+            scoreBreakdown.Credentials += data.PortfolioQuality * WEIGHTS.Credentials.PortfolioQuality;
+            if (data.Email && data.Email.includes('@')) scoreBreakdown.Credentials += 3;
+            if (data.Phone && data.Phone.length > 5) scoreBreakdown.Credentials += 3;
+            if (data.Skill_Python) scoreBreakdown.Technical += WEIGHTS.Technical.Skill_Python;
+            if (data.Skill_ML) scoreBreakdown.Technical += WEIGHTS.Technical.Skill_ML;
+            if (data.Skill_WebDev) scoreBreakdown.Technical += WEIGHTS.Technical.Skill_WebDev;
+            if (data.Skill_Node) scoreBreakdown.Technical += WEIGHTS.Technical.Skill_Node;
+            if (data.Skill_SQL) scoreBreakdown.Technical += WEIGHTS.Technical.Skill_SQL;
+            if (data.Skill_NoSQL) scoreBreakdown.Technical += WEIGHTS.Technical.Skill_NoSQL;
+            if (data.Skill_Cloud) scoreBreakdown.Technical += WEIGHTS.Technical.Skill_Cloud;
+            if (data.Skill_AWS) scoreBreakdown.Technical += WEIGHTS.Technical.Skill_AWS;
+            if (data.Skill_GCP) scoreBreakdown.Technical += WEIGHTS.Technical.Skill_GCP;
+            if (data.Skill_DataEng) scoreBreakdown.Technical += WEIGHTS.Technical.Skill_DataEng;
+            if (data.Skill_DevOps) scoreBreakdown.Technical += WEIGHTS.Technical.Skill_DevOps;
+            if (data.Skill_NLP) scoreBreakdown.Technical += WEIGHTS.Technical.Skill_NLP;
+            if (data.Skill_AI_Exposure) scoreBreakdown.Technical += WEIGHTS.Technical.Skill_AI_Exposure;
+            scoreBreakdown.SoftSkills += data.Soft_Teamwork * WEIGHTS.SoftSkills.Soft_Teamwork;
+            scoreBreakdown.SoftSkills += data.Soft_Comm * WEIGHTS.SoftSkills.Soft_Comm;
+            const totalScoreRaw = scoreBreakdown.Credentials + scoreBreakdown.Technical + scoreBreakdown.SoftSkills;
+            const finalScore = Math.min(100, Math.round((totalScoreRaw / MAX_SCORE_RAW) * 100));
+            let role = 'Career Explorer (Trainee)';
+            let confidence = Math.min(95, 60 + Math.floor(finalScore / 5));
+            let interpretation = 'Level: Trainee';
+            let skillGap = 'Immediate priority: Focus on building a basic portfolio and acquiring foundational technical skills (Python, SQL).';
+
+            if (finalScore >= 85) { role = 'Senior AI Solutions Architect'; skillGap = 'Highly competitive. Focus on Thought Leadership.'; interpretation = 'Level: Expert/Lead'; }
+            else if (finalScore >= 70) { if (data.Skill_ML && data.CertificationLevel >= 2) { role = 'Machine Learning Engineer (Mid-Senior)'; skillGap = data.Skill_AI_Exposure ? 'Focus on advanced MLOps and ethical AI practices.' : 'Critical Gap: Acquire Generative AI/LLM exposure.'; } else if (data.Skill_WebDev && data.Skill_SQL) { role = 'Full-Stack Developer (Mid-Senior)'; skillGap = 'Critical Gap: Obtain a major Cloud Certification.'; } else { role = 'Senior Data Analyst / BI Consultant'; skillGap = 'To move into engineering, develop Python and Cloud skills.'; } interpretation = 'Level: Mid-to-Senior'; }
+            else if (finalScore >= 50) { role = 'Junior Developer / Analyst'; skillGap = 'Priority: Achieve Certification Level 2 and improve Portfolio Quality.'; interpretation = 'Level: Junior'; }
+
+            return { role, finalScore, confidence: confidence.toFixed(0) + '%', skillGap, interpretation, breakdown: scoreBreakdown };
+        }
+
+        async function runPredictionFlow() {
+            const payload = getFormDataObject();
+            if (!payload) { alert('Please fill the form.'); return; }
+            predictBtn.disabled = true; predictBtn.textContent = 'Processing...';
+            const aiOutEl = document.getElementById('aiOutput'); if (aiOutEl) aiOutEl.textContent = 'Running analysis...';
+            await new Promise(r => setTimeout(r, 600));
+            const result = localSimulatedAIPrediction(payload);
+            result.inputs = payload; result.timestamp = new Date().toISOString(); applyPredictionToUI(result); predictBtn.disabled = false; predictBtn.textContent = '🚀 Run Career Analysis'; showToast('Analysis complete');
+        }
+
+        predictBtn.addEventListener('click', async () => { try { await runPredictionFlow(); } catch (e) { console.error('Prediction failed', e); alert('Prediction failed. See console for details.'); predictBtn.disabled = false; predictBtn.textContent = '🚀 Run Career Analysis'; } });
+
+        /**********************
+         * Initial state
+         **********************/
+        resetResults();
+    </script>
+</body>
+</html>
